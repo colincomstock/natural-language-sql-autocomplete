@@ -1,45 +1,48 @@
 import Groq from "groq-sdk"
-
-export type QueryOption = {
-    sqlQuery: string;
-    description: string;
-};
-
-export type AutocompleteResponse = {
-    suggestions: QueryOption[];
-};
+import type { QueryOption, AutocompleteResponse, Message } from "../types";
 
 const groq = new Groq({
     apiKey: import.meta.env.VITE_GROQ_API_KEY as string,
     dangerouslyAllowBrowser: true
 });
 
-const SYSTEM_PROMPT = `
-System Message:
+function messageContentToString(content: Message['content']): string {
+    if (typeof content === 'string') return content;
+    return content.map(c => c.text || '').join('\n');
+};
 
+export default async function autocomplete(
+    userInput: string,
+    conversationHistory: Message[],
+    schemaDescription: string,
+    signal?: AbortSignal
+): Promise<QueryOption[]> {
+
+    const SYSTEM_PROMPT = `
 You are a low-latency autocomplete engine that converts partial natural language input into SQL queries for a known PostgreSQL database schema.
 
-Your goals:
-- Respond as fast as possible, prioritizing low latency over perfect accuracy.
-- Always produce 3 DIFFERENT SQL query suggestions for each user input.
-- Output only valid JSON, with no markdown, no commentary, and no extra text.
-- Never ask follow-up questions. Never explain your reasoning. Never apologize.
-- You are not a chat assistant. You are an autocomplete service that returns a JSON object in the exact required format.
+## Your job
+Given:
+- A **natural language schema description**.
+- A **conversation history** consisting of previous natural language queries and your past SQL suggestions.
+- The **current user input**.
 
-DATABASE SCHEMA (read-only context)
+You must return **exactly 3 different SQL query suggestions** as JSON.
 
-Table: events
-Description: User-generated analytics events such as page views, clicks, and custom actions.
+## Core Rules
+- Always respond as fast as possible. Latency matters more than perfect accuracy.
+- ALWAYS treat the **conversation history** as relevant context.
+  - If the current input looks like a refinement (e.g. “make that by day”, “only for US”, “now group by device”), assume it is a continuation of the **most recent user query**.
+  - If the current input clearly starts a new topic, treat it as a new query.
+- You must decide for each suggestion whether it is:
+  - a **new query** (independent of previous context), or
+  - **expanding on previous** (refining / modifying the last query).
+  Encode this at the **start** of the description string:
+    - "(new query) ..." 
+    - "(expanding on previous) ..."
 
-Columns:
-- id (bigint, primary key)
-- user_id (bigint, foreign key to users.id) — the user who triggered the event
-- name (text) — name of the event, e.g. "page_view", "signup", "purchase"
-- properties (jsonb) — miscellaneous attributes describing the event
-- occurred_at (timestamp) — timestamp when the event occurred
-
-Required Output Format
-You must always return exactly one JSON object using this schema:
+## Output format (STRICT)
+Return exactly one JSON object:
 
 {
   "suggestions": [
@@ -49,47 +52,53 @@ You must always return exactly one JSON object using this schema:
   ]
 }
 
-Diversity Requirements:
-- Each suggestion MUST be meaningfully different from the others.
-- Vary by specificity (broad vs narrow filters).
-- Vary by time scope (recent vs all-time vs specific periods).
-- Vary by aggregation (individual records vs counts vs summaries).
-- Vary by sorting/limiting (top N, recent N, all records).
-
-Rules:
-- Always return exactly 3 suggestions.
+- Exactly 3 suggestions.
 - No extra keys.
+- No markdown.
+- No commentary.
 - No null values unless absolutely necessary.
 - Never wrap the JSON in backticks.
-- If the input is unclear or incomplete, make your best guess for all 3 options.
+
+## Diversity Requirements
+The 3 suggestions MUST be meaningfully different. Where possible, vary:
+- Specificity (broad vs narrow filters).
+- Time scope (recent vs all-time vs specific periods).
+- Aggregation (raw rows vs counts vs summaries).
+- Sorting / limiting (top N, recent N, all records).
+
+## Schema (read-only context)
+${schemaDescription}
 `.trim();
 
-export default async function autocomplete(
-    userInput: string,
-    signal?: AbortSignal
-): Promise<QueryOption[]> {
+    const historyMessages = conversationHistory.map(message => ({
+        role: message.role,
+        content: messageContentToString(message.content)
+    }));
+
     const completion = await groq.chat.completions.create(
         {
             model: "llama-3.1-8b-instant",
             response_format: { type: "json_object" },
-            temperature: 0.3,
+            temperature: 0.1,
             max_tokens: 1000,
             messages: [
                 { role: "system", content: SYSTEM_PROMPT },
+                ...historyMessages,
                 {
                     role: "user",
-                    content: `
-                    CURRENT USER INPUT:
-                    "${userInput}"
+                    content: `CURRENT USER INPUT:
+"${userInput}"
 
-                    Generate 3 DIFFERENT SQL query suggestions based on the CURRENT USER INPUT using the known schema.
+Instructions:
+- Use BOTH the conversation history and the current user input.
+- If the current input appears to refine or continue a previous query, treat it as a continuation.
+- If it clearly starts a different topic, treat it as a new query.
+- For each suggestion, prefix the description with:
+- "(new query)" if it is independent of previous queries, or
+- "(expanding on previous)" if it builds on the last relevant query from the history.
 
-                    Remember:
-                    - Respond as fast as possible.
-                    - Return exactly 3 diverse suggestions.
-                    - Output only the JSON object required by the system prompt.
-                    - No extra text.
-                    `.trim(),
+Now generate 3 DIFFERENT SQL query suggestions, following the JSON format from the system message.
+`.trim(),
                 },
             ],
         },
@@ -98,6 +107,8 @@ export default async function autocomplete(
 
     const raw = completion.choices?.[0]?.message?.content ?? '{"suggestions":[]}';
     const response = JSON.parse(raw) as AutocompleteResponse;
+
+    console.log(historyMessages);
     
     return response.suggestions;
 }
