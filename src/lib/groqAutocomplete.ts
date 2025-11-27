@@ -109,7 +109,7 @@ Now generate 3 DIFFERENT SQL query suggestions, following the JSON format from t
     const response = JSON.parse(raw) as AutocompleteResponse;
 
     console.log(historyMessages);
-    
-    return response.suggestions;
+    console.log(response)
+    return response.suggestions.slice(0, 3);
 }
 
