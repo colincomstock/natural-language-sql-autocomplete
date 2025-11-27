@@ -1,3 +1,5 @@
+// Depricated local function for connecting to Groq service
+
 import Groq from "groq-sdk"
 import type { QueryOption, AutocompleteResponse, Message } from "../types";
 

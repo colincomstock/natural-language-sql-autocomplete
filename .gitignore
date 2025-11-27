@@ -61,3 +61,14 @@ lerna-debug.log*
 # OS files
 Thumbs.db
 Desktop.ini
+
+# Cloudflare Worker
+sql-autocomplete-worker/autocomplete-worker/.dev.vars
+sql-autocomplete-worker/autocomplete-worker/.wrangler/
+sql-autocomplete-worker/autocomplete-worker/node_modules/
+.wrangler/
+.dev.vars
+
+# Editor configuration
+.editorconfig
+.prettierrc

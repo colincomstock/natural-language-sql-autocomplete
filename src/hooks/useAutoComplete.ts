@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import autocomplete from '../lib/groqAutocomplete';
+import autocomplete from '../lib/autoCompleteClient';
 import type { QueryOption, Message, HistoryItem } from '../types';
 
 export function useAutocomplete(
