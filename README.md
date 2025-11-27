@@ -1,6 +1,8 @@
 # Natural Language SQL Autocomplete
 
-An autocomplete interface that generates SQL queries from natural language input using LLMs. Built with React, TypeScript, and Cloudflare Workers. Visual styling loosely based on the google homepage.
+An autocomplete interface that generates SQL queries from natural language input using LLMs. Built with React, TypeScript, and Cloudflare Workers. Visual styling loosely based on the google homepage. Hosted here:
+
+https://nl-sql-autocomplete.pages.dev/
 
 ## Features
 
