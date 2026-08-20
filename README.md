@@ -23,13 +23,13 @@ https://nl-sql-autocomplete.pages.dev/
 
 ### Backend
 - **Cloudflare Worker** as API proxy to secure credentials
-- **Groq SDK** with **llama-3.1-8b-instant** model (chosen for speed)
+- **Groq SDK** with **openai/gpt-oss-20b** model (chosen for speed and structured output reliability)
 - CORS-enabled REST endpoint for frontend communication
 - JSON response validation and error handling
 ## Design Decisions
 
 ### Speed vs Accuracy
-I chose Groq as the provider because their LPU based archticture seems to be the market leader in speedy inferrence. Within their platform, I chose llama-3.1-8b-instant over larger models because autocomplete needs to feel instant and it needs to be cheap due to the high number of requests. The model occasionally returns imperfect suggestions, but users can pick from 3 options and the response time stays under a second. I first developed a local version that reached out to Groq, then moved it over to a Cloudflare Worker. My experience is that Cloudflare Workers offer incredibly fast responses and have an incredibly generous free tier. The speed on the local version and the deployed version appear functionally identical.
+I chose Groq as the provider because their LPU based architecture seems to be the market leader in speedy inference. I originally used llama-3.1-8b-instant because autocomplete needs to feel instant and it needs to be cheap due to the high number of requests. After that model was deprecated, I switched to openai/gpt-oss-20b because it preserves the low-latency feel while improving output quality and structured JSON reliability. The model can still occasionally return imperfect suggestions, but users can pick from 3 options and the response time stays fast enough for an autocomplete-style interface. I first developed a local version that reached out to Groq, then moved it over to a Cloudflare Worker. My experience is that Cloudflare Workers offer incredibly fast responses and have an incredibly generous free tier. The speed on the local version and the deployed version appear functionally identical.
 
 ### Context Management
 The system remembers your last 5 queries to understand follow-ups like "make that by day" or "only for US users." This balances conversation continuity with keeping prompts small enough for fast responses.

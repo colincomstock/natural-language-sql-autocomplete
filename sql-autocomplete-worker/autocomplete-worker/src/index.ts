@@ -103,7 +103,8 @@ ${schemaDescription}
 
             const completion = await groq.chat.completions.create(
                 {
-                    model: "llama-3.1-8b-instant",
+                    model: "openai/gpt-oss-20b",
+                    reasoning_effort: "low",
                     response_format: { type: "json_object" },
                     temperature: 0.1,
                     max_tokens: 1000,
